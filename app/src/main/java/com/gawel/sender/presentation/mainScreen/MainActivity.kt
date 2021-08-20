@@ -46,7 +46,7 @@ class MainActivity : AppCompatActivity() {
                     .show()
                 return@setOnClickListener
             } else {
-                var adressIPEdiTText = binding.addressIp.editText!!.text
+                val adressIPEdiTText = binding.addressIp.editText!!.text
                 if (adressIPEdiTText.isNullOrEmpty()) {
                     Snackbar.make(editText, "Adress IP nie może być pusty", Snackbar.LENGTH_SHORT)
                         .show()

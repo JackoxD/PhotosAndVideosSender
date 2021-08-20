@@ -5,8 +5,8 @@ import com.gawel.core.models.Result
 
 interface ISharedPrefsRepository {
 
-    suspend fun getLastSendingDate() : Result<Failure, Long>;
+    fun getLastSendingDate() : Result<Failure, Long>;
 
-    suspend fun setLastSendingDate(date: Long);
+    fun setLastSendingDate(date: Long);
 
 }

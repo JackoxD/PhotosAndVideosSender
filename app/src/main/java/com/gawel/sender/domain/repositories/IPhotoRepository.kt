@@ -6,7 +6,7 @@ import com.gawel.sender.domain.models.Photo
 
 
 interface IPhotoRepository {
-    suspend fun getPhotosFromDevice(fromDate: Long): Result<Failure, List<Photo>>
+    fun getPhotosFromDevice(fromDate: Long): Result<Failure, List<Photo>>
 
-    suspend fun put(photo: Photo)
+    fun put(photo: Photo)
 }

@@ -1,8 +1,7 @@
 package com.gawel.core.models
 
-open class Result<Failure, out S> {
+sealed class Result<Failure, out S> {
 
-    data class SUCCESS<S>(val data: S) : Result<Failure, S>() {
-    }
-    data class ERROR<S>(val throwable: Failure) : Result<Failure, S>()
+    data class SUCCESS<Failure, S>(val data: S) : Result<Failure, S>()
+    data class ERROR<Failure, S>(val throwable: Failure) : Result<Failure, S>()
 }

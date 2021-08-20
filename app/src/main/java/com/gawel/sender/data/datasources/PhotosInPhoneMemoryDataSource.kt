@@ -10,7 +10,7 @@ import com.gawel.sender.data.models.PhotoDevice
 private const val TAG = "PhotosInPhoneMemoryData"
 class PhotosInPhoneMemoryDataSource(private val context: Context) {
 
-    suspend fun getPhotosFromDevice(fromDate: Long): List<PhotoDevice> {
+    fun getPhotosFromDevice(fromDate: Long): List<PhotoDevice> {
 
         val collection =
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -72,7 +72,7 @@ class PhotosInPhoneMemoryDataSource(private val context: Context) {
         return photosList
     }
 
-    suspend fun put(photo: PhotoDevice) {
+    fun put(photo: PhotoDevice) {
         TODO("Not yet implemented")
     }
 }

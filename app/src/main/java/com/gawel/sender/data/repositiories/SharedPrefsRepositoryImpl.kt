@@ -10,7 +10,7 @@ import java.lang.Exception
 
 private const val TAG = "SharedPrefsRepositoryIm"
 class SharedPrefsRepositoryImpl(private val sharedPrefsDataSource: SharedPrefsDataSource) : ISharedPrefsRepository {
-    override suspend fun getLastSendingDate(): Result<Failure, Long> {
+    override fun getLastSendingDate(): Result<Failure, Long> {
         return try {
             Result.SUCCESS(sharedPrefsDataSource.getLastSendingDate())
         } catch (e: Exception) {
@@ -19,7 +19,7 @@ class SharedPrefsRepositoryImpl(private val sharedPrefsDataSource: SharedPrefsDa
         }
     }
 
-    override suspend fun setLastSendingDate(date: Long) {
+    override fun setLastSendingDate(date: Long) {
         try {
             sharedPrefsDataSource.setLastSendingDate(date)
         } catch (e: Exception) {

@@ -10,55 +10,101 @@ import com.gawel.sender.domain.repositories.IPhotoRepository
 import com.gawel.sender.domain.repositories.IPhotoSenderSocketRepository
 import com.gawel.sender.domain.repositories.ISharedPrefsRepository
 import dagger.hilt.EntryPoint
+import java.net.Socket
 
 private class GetLastSendingPhotoDate(private val sharedPreferences: ISharedPrefsRepository) :
     BaseUseCaseNoParams<Long>() {
-    override suspend operator fun invoke() =
+    override operator fun invoke() =
         sharedPreferences.getLastSendingDate()
 }
 
 class GetPhotos(private val photoRepository: IPhotoRepository) :
     BaseUseCase<List<Photo>, Long>() {
-    override suspend operator fun invoke(params: Long) =
+    override operator fun invoke(params: Long) =
         photoRepository.getPhotosFromDevice(params)
 }
 
 private class SetLastSendingTime(private val sharedPreference: ISharedPrefsRepository) {
-    suspend operator fun invoke(date: Long) {
+    operator fun invoke(date: Long) {
         sharedPreference.setLastSendingDate(date)
     }
 }
 
-private class SendPhotosBySocket(private val photoSenderSocketRepository: IPhotoSenderSocketRepository) {
-    suspend operator fun invoke(photos: List<Photo>) =
-        photoSenderSocketRepository.sendPhotos(photos)
+private class CreateSocket(private val photoSenderSocketRepository: IPhotoSenderSocketRepository) {
+    operator fun invoke() =
+        photoSenderSocketRepository.createSocket()
+}
+
+private class Connect(private val photoSenderSocketRepository: IPhotoSenderSocketRepository) {
+    operator fun invoke(host: String, port: Int, socket: Socket) =
+        photoSenderSocketRepository.connect(host, port, socket)
+}
+
+private class SendPhoto(private val photoSenderSocketRepository: IPhotoSenderSocketRepository) {
+    operator fun invoke(photo: Photo, albumName: String, socket: Socket) =
+        photoSenderSocketRepository.sendPhotos(photo, albumName, socket)
+}
+
+private class Disconnect(private val photoSenderSocketRepository: IPhotoSenderSocketRepository) {
+    operator fun invoke(socket: Socket) =
+        photoSenderSocketRepository.disconnect(socket)
 }
 
 class SendNewPhotosToRemoteDevice(
     private val sharedPreference: ISharedPrefsRepository,
     private val photoRepository: IPhotoRepository,
     private val photoSenderSocketRepository: IPhotoSenderSocketRepository
-) : BaseUseCaseNoParams<Boolean>() {
-    override suspend fun invoke(): Result<Failure, Boolean> {
+) : BaseUseCase<Boolean, SendNewPhotosToRemoteDevice.SendNewPhotosParams>() {
+    override fun invoke(
+        params: SendNewPhotosParams): Result<Failure, Boolean> {
         val lastSendedPhotoDateResult = GetLastSendingPhotoDate(sharedPreference).invoke()
         if (lastSendedPhotoDateResult is Result.SUCCESS) {
             val lastSendedPhotoDate = lastSendedPhotoDateResult.data
             val getPhotosResult = GetPhotos(photoRepository).invoke(lastSendedPhotoDate)
             if (getPhotosResult is Result.SUCCESS) {
                 val photosList = getPhotosResult.data
-                val sendPhotosResult =
-                    SendPhotosBySocket(photoSenderSocketRepository).invoke(photosList)
-                if (sendPhotosResult is Result.SUCCESS)
-                    SetLastSendingTime(sharedPreference).invoke(sendPhotosResult.data)
-                else if (sendPhotosResult is Result.ERROR)
-                    return Result.ERROR(sendPhotosResult.throwable)
-                return Result.SUCCESS(true)
-            } else if (getPhotosResult is Result.ERROR)
-                return Result.ERROR(getPhotosResult.throwable)
-        } else if (lastSendedPhotoDateResult is Result.ERROR) {
-            return Result.ERROR(lastSendedPhotoDateResult.throwable)
+                if (photosList.isNullOrEmpty()) {
+                    return Result.ERROR(UnknownError())
+                }
+                when (val socketResult = CreateSocket(photoSenderSocketRepository).invoke()) {
+                    is Result.SUCCESS -> {
+                        when (val connectionResult = Connect(photoSenderSocketRepository).invoke(
+                            params.host, 4000, socketResult.data
+                        )) {
+                            is Result.SUCCESS -> {
+                                for (photo in photosList) {
+                                    when (val sendPhotoResult =
+                                        SendPhoto(photoSenderSocketRepository).invoke(
+                                            photo, params.albumName, socketResult.data
+                                        )) {
+                                        is Result.SUCCESS -> {
+                                            SetLastSendingTime(sharedPreference).invoke(
+                                                sendPhotoResult.data
+                                            )
+                                        }
+                                        is Result.ERROR -> return Result.ERROR(sendPhotoResult.throwable)
+                                    }
+
+                                }
+                                return when (val disconnectResult =
+                                    Disconnect(photoSenderSocketRepository).invoke(socketResult.data)) {
+                                    is Result.SUCCESS -> Result.SUCCESS(true)
+                                    is Result.ERROR -> Result.ERROR(disconnectResult.throwable)
+                                }
+                            }
+                            is Result.ERROR -> return Result.ERROR(connectionResult.throwable)
+                        }
+                    }
+                    is Result.ERROR -> return Result.ERROR(socketResult.throwable)
+                }
+            }
         }
         return Result.ERROR(UnknownError())
+
     }
+
+    class SendNewPhotosParams(
+        val host: String,
+        val albumName: String)
 }
 

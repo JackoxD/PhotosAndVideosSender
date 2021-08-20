@@ -3,6 +3,7 @@ package com.gawel.sender.presentation.mainScreen
 import android.app.Application
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.LiveData
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkRequest
@@ -23,7 +24,8 @@ private const val TAG = "MainViewModel"
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
-    val ipsAdresses = MutableLiveData<String>()
+    private val _ipsAdresses = MutableLiveData<String>()
+    val ipsAdresses : LiveData<String> = _ipsAdresses
 
     private lateinit var uploadPhotosWorker: WorkRequest
 
@@ -62,7 +64,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         s.receive(p); // blocks until something is received
         text = String(message, 0, p.length)
         Log.d(TAG, "searchForBroadcasts: received: $text")
-        ipsAdresses.postValue(text)
+        _ipsAdresses.postValue(text)
 
         s.close()
     }

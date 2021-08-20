@@ -9,37 +9,59 @@ import com.gawel.core.models.UnknownError
 import com.gawel.sender.domain.models.Photo
 import com.gawel.sender.domain.repositories.IPhotoSenderSocketRepository
 import java.io.DataOutputStream
+import java.lang.Exception
 import java.net.InetSocketAddress
 import java.net.Socket
 
 private const val TAG = "PhotoSenderSocketReposi"
 
-class PhotoSenderSocketRepositoryImpl(
-    private val host: String,
-    private val albumName: String,
-    private val context: Context
-) : IPhotoSenderSocketRepository {
+const val timeout = 2000
+class PhotoSenderSocketRepositoryImpl(private val context: Context) : IPhotoSenderSocketRepository {
 
-    private val port = 4000
-    private val soTimeout = 2000
     private val connectTimeout = 4000
 
-    private lateinit var socket: Socket
 
     private var connected = false
 
-    override suspend fun sendPhotos(photos: List<Photo>): Result<Failure, Long> {
+    override fun createSocket(): Result<Failure, Socket> {
+        return try {
+            Result.SUCCESS(Socket().apply {
+                soTimeout = timeout
+            })
+        } catch (e: Exception) {
+            Result.ERROR(UnknownError())
+        }
+    }
 
-        socket = Socket()
-        socket.soTimeout = this.soTimeout
+    override fun connect(host: String, port: Int, socket: Socket): Result<Failure, Boolean> {
+        return try {
+            socket.connect(InetSocketAddress(host, port), connectTimeout)
+            onConnected()
+            Result.SUCCESS(true)
+        } catch (e: Exception) {
+            Result.SUCCESS(false)
+
+        }
+    }
+
+    override fun disconnect(socket: Socket): Result<Failure, Boolean> {
+        return try {
+            socket.close()
+            onDisconnected()
+            Result.SUCCESS(true)
+        } catch (e: Exception) {
+            Result.SUCCESS(false)
+        }
+
+    }
+
+    override fun sendPhotos(photo: Photo, albumName: String, socket: Socket): Result<Failure, Long> {
 
         var lastSendedDate = 0L
 
-        for (photo in photos) {
-            val uploadImage = uploadImage(photo, host, albumName)
+            val uploadImage = uploadImage(photo, albumName, socket)
             if (uploadImage != null)
                 lastSendedDate = uploadImage
-        }
 
 
         return if (lastSendedDate <= 0L)
@@ -49,22 +71,13 @@ class PhotoSenderSocketRepositoryImpl(
 
     }
 
-    private fun uploadImage(photo: Photo, host: String, albumName: String): Long? {
+    private fun uploadImage(photo: Photo, albumName: String, socket: Socket): Long? {
         // Open a specific media item using InputStream.
         val uri = photo.uri ?: throw DefaultException.UriCannotBeNull()
         val resolver = context.contentResolver
         resolver.openInputStream(uri).use { stream ->
             photo.size = stream!!.available().toLong()
             // Perform operations on "stream".
-            if (!connected) {
-                try {
-                    socket.connect(InetSocketAddress(host, port), connectTimeout)
-                    onConnected()
-                } catch (e: Throwable) {
-                    Log.e(TAG, "uploadImage: ", e)
-                    return null
-                }
-            }
             if (connected) {
                 val dataOutputStream = DataOutputStream(socket.getOutputStream())
                 dataOutputStream.write(byteArrayOf(0)) // send byte of file type
@@ -73,9 +86,8 @@ class PhotoSenderSocketRepositoryImpl(
                 dataOutputStream.writeLong(photo.size!!) // send file length
                 socket.getOutputStream().write(stream.readBytes()) // send file
                 return photo.dateTaken
-            }
+            } else throw Exception("No connected")
         }
-        return null;
     }
 
     private fun onConnected() {

@@ -8,10 +8,10 @@ class SharedPrefsDataSource(context: Context) {
 
     val sendingDateKey = "sending_date"
 
-    suspend fun getLastSendingDate() =
+    fun getLastSendingDate() =
         sharedPrefs.getLong(sendingDateKey, 0)
 
-    suspend fun setLastSendingDate(date: Long) {
+    fun setLastSendingDate(date: Long) {
         sharedPrefs.edit().putLong(sendingDateKey, date).apply()
     }
 }
